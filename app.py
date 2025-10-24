@@ -1,5 +1,5 @@
 # =======================
-# app.py complet
+# app.py - version lisible avec colonnes auto-ajustées
 # =======================
 
 import streamlit as st
@@ -7,20 +7,14 @@ import pandas as pd
 import numpy as np
 from st_aggrid import AgGrid, GridOptionsBuilder
 
-# =======================
-# 🔹 Page Streamlit
-# =======================
 st.set_page_config(page_title="FT Scoring", layout="wide")
 st.title("Calculateur de scoring FT")
 
-# =======================
-# 🔹 Upload Excel
-# =======================
 uploaded_file = st.file_uploader("Choisissez votre fichier Excel", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
-    # Nettoyage des noms de colonnes
+    # Nettoyage des colonnes
     df.columns = (
         df.columns.str.strip()
                   .str.lower()
@@ -28,35 +22,36 @@ if uploaded_file:
                   .str.replace('_', ' ')
                   .str.strip()
     )
-    st.success("Fichier chargé et colonnes nettoyées")
-    st.write("Colonnes détectées :", list(df.columns))
+
+    # Arrondir toutes les colonnes numériques à 2 décimales
+    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    df[num_cols] = df[num_cols].round(2)
 
     # =======================
-    # 🔹 Fonctions de calcul des scores
+    # 🔹 Fonctions calcul scores
     # =======================
     def weighted_salary(salary):
         if pd.isna(salary):
             return np.nan
         salary = max(30000, min(150000, salary))
-        return (salary - 30000) / (150000 - 30000)
+        return round((salary - 30000) / (150000 - 30000), 2)
 
     def salary_increase(perc):
         if pd.isna(perc):
             return np.nan
         perc = max(0, min(100, perc))
-        return perc / 100
+        return round(perc / 100, 2)
 
     def simple_scale(value):
         if pd.isna(value):
             return np.nan
-        return min(1, max(0, value / 10))
+        return round(min(1, max(0, value / 10)), 2)
 
     def value_for_money(salary, tuition):
         if pd.isna(salary) or pd.isna(tuition):
             return np.nan
-        value = salary - tuition
-        value = max(10000, min(100000, value))
-        return (value - 10000) / (100000 - 10000)
+        value = max(10000, min(100000, salary - tuition))
+        return round((value - 10000) / (100000 - 10000), 2)
 
     def international_work_mobility(fm, fn, fo):
         if (fn == "-" and fo == "-"):
@@ -80,8 +75,7 @@ if uploaded_file:
                     score += 1
                 elif fo == "France" and fm != "France" and fn != "France":
                     score += 0.5
-        score = (score * 10 / 1.5) / 10
-        return min(1, round(score, 3))
+        return round(min(1, score * 10 / 1.5 / 10), 2)
 
     def career_progress_score(start_title, current_title, start_size, current_size):
         levels = {
@@ -121,11 +115,10 @@ if uploaded_file:
 
         level_progress = max(0, current_level - start_level)
         size_progress = max(0, current_size_num - start_size_num)
-        score = (level_progress + size_progress) / 7
-        return min(1, round(score, 3))
+        return round(min(1, (level_progress + size_progress)/7), 2)
 
     # =======================
-    # 🔹 Calcul des scores
+    # 🔹 Calcul scores
     # =======================
     df["weighted_salary_score"] = df["weighted salary"].apply(weighted_salary)
     df["salary_increase_score"] = df["salary percentage increase"].apply(salary_increase)
@@ -133,46 +126,47 @@ if uploaded_file:
     df["career_service_score"] = df["careers service satisfaction"].apply(simple_scale)
     df["alumni_network_score"] = df["alumni network satisfaction"].apply(simple_scale)
     df["value_for_money_score"] = df.apply(lambda x: value_for_money(x["weighted salary"], x["tuition fee"]), axis=1)
-    df["career_progress_score"] = df.apply(lambda x: career_progress_score(x["posteinitial"], x["posteactuel"],
-                                                                           x["tailleinitiale"], x["tailleactuelle"]), axis=1)
+    df["career_progress_score"] = df.apply(lambda x: career_progress_score(
+        x["posteinitial"], x["posteactuel"], x["tailleinitiale"], x["tailleactuelle"]), axis=1)
 
     score_cols = [c for c in df.columns if c.endswith("_score")]
-    df["final_score"] = df[score_cols].mean(axis=1)
+    df["final_score"] = df[score_cols].mean(axis=1).round(2)
 
-    st.success("Calcul des scores terminé ✅")
+    # =======================
+    # 🔹 Fonction pour affichage AgGrid avec colonnes auto et max width
+    # =======================
+    def display_table(df, height=300):
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_default_column(
+            filter=True,
+            sortable=True,
+            resizable=True,
+            editable=False,
+            minWidth=80,
+            maxWidth=250
+        )
+        gb.configure_grid_options(domLayout='normal', suppressHorizontalScroll=False, autoSizeColumns=True)
+        gridOptions = gb.build()
+        AgGrid(df, gridOptions=gridOptions, height=height, fit_columns_on_grid_load=True)
 
     # =======================
     # 🔹 Onglets Streamlit
     # =======================
     tab1, tab2 = st.tabs(["Tableaux", "Visualisations"])
 
-    # ==================== Onglet Tableaux ====================
     with tab1:
         st.subheader("Scores seulement")
-        scores_cols = score_cols + ["final_score"]
-        df_scores = df[scores_cols]
-        gb1 = GridOptionsBuilder.from_dataframe(df_scores)
-        gb1.configure_default_column(filter=True, sortable=True, editable=False)
-        gridOptions1 = gb1.build()
-        AgGrid(df_scores, gridOptions=gridOptions1, height=300, fit_columns_on_grid_load=True)
+        df_scores = df[score_cols + ["final_score"]]
+        display_table(df_scores, height=300)
 
         st.subheader("Données originales sans scores")
-        original_cols = [c for c in df.columns if c not in scores_cols + ["final_score"]]
+        original_cols = [c for c in df.columns if c not in score_cols + ["final_score"]]
         df_original = df[original_cols]
-        gb2 = GridOptionsBuilder.from_dataframe(df_original)
-        gb2.configure_default_column(filter=True, sortable=True, editable=False)
-        gridOptions2 = gb2.build()
-        AgGrid(df_original, gridOptions=gridOptions2, height=300, fit_columns_on_grid_load=True)
+        display_table(df_original, height=300)
 
         st.subheader("Tableau complet")
-        gb3 = GridOptionsBuilder.from_dataframe(df)
-        gb3.configure_default_column(filter=True, sortable=True, editable=False)
-        gridOptions3 = gb3.build()
-        AgGrid(df, gridOptions=gridOptions3, height=400, fit_columns_on_grid_load=True)
+        display_table(df, height=400)
 
-    # ==================== Onglet Visualisations ====================
     with tab2:
         st.subheader("Visualisations des scores")
         st.info("Les graphiques seront ajoutés ici prochainement.")
-
-
