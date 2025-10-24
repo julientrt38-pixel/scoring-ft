@@ -4,7 +4,7 @@ import numpy as np
 import altair as alt
 
 # =======================
-# 🔹 Titre et description
+# 🔹 Page Streamlit
 # =======================
 st.set_page_config(page_title="FT Scoring", layout="wide")
 st.title("Calculateur de scoring FT")
@@ -14,7 +14,7 @@ selon les critères utilisés par le Financial Times.
 **Instructions :**  
 - Téléversez votre fichier Excel avec les colonnes attendues.  
 - Vérifiez les colonnes détectées ci-dessous.  
-- Visualisez les scores, graphiques et téléchargez le résultat.
+- Visualisez les scores, top 10 et graphiques.
 """)
 
 # =======================
@@ -36,7 +36,7 @@ if uploaded_file:
     st.write(list(df.columns))
 
     # ============================================
-    # 🔹 Fonctions de calcul des scores (simplifiées)
+    # 🔹 Fonctions de calcul des scores
     # ============================================
     def weighted_salary(salary):
         if pd.isna(salary): return np.nan
@@ -96,7 +96,7 @@ if uploaded_file:
         return min(1, round(score, 3))
 
     # ====================================
-    # 🔹 Calcul des scores
+    # 🔹 Mapping colonnes pour les scores
     # ====================================
     mapping = {
         "weighted_salary": "weighted salary",
@@ -112,6 +112,9 @@ if uploaded_file:
         "current_size": "tailleactuelle"
     }
 
+    # ====================================
+    # 🔹 Calcul des scores
+    # ====================================
     df["weighted_salary_score"] = df[mapping["weighted_salary"]].apply(weighted_salary)
     df["salary_increase_score"] = df[mapping["salary_increase"]].apply(salary_increase)
     df["aims_achieved_score"] = df[mapping["aims_achieved"]].apply(simple_scale)
@@ -127,33 +130,51 @@ if uploaded_file:
     score_cols = [c for c in df.columns if c.endswith("_score")]
     df["final_score"] = df[score_cols].mean(axis=1)
 
-    # ====================================
-    # 🔹 Affichage et graphiques
-    # ====================================
-    st.subheader("Aperçu des scores")
-    st.dataframe(df.head(10))
+    # =======================================
+    # 🔹 Onglets : Données + Analyses
+    # =======================================
+    tab1, tab2 = st.tabs(["Données & Top 10", "Visualisations"])
 
-    st.subheader("Distribution des scores")
-    chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X("final_score", bin=alt.Bin(maxbins=20)),
-        y='count()'
-    )
-    st.altair_chart(chart, use_container_width=True)
+    # ------------------- Onglet 1 -------------------
+    with tab1:
+        st.subheader("Tableau complet avec scores")
+        st.dataframe(df.head(20))
 
-    st.subheader("Top 10 profils")
-    st.dataframe(df.sort_values("final_score", ascending=False).head(10))
+        # Filtres interactifs
+        st.subheader("Filtrer les profils")
+        score_min = st.slider("Score minimum", 0.0, 1.0, 0.0)
+        filtered_df = df[df["final_score"] >= score_min]
+        st.dataframe(filtered_df.head(20))
 
-    # ====================================
-    # 🔹 Téléchargement
-    # ====================================
-    output_file = "resultats_scores.xlsx"
-    df.to_excel(output_file, index=False, engine='openpyxl')
-    with open(output_file, "rb") as f:
-        st.download_button("Télécharger le fichier Excel complet", f, file_name=output_file)
-    
-    # Optionnel : top 10
-    top10_file = "top10_scores.xlsx"
-    df.sort_values("final_score", ascending=False).head(10).to_excel(top10_file, index=False, engine='openpyxl')
-    with open(top10_file, "rb") as f:
-        st.download_button("Télécharger le Top 10", f, file_name=top10_file)
+        # Top 10
+        st.subheader("Top 10 profils")
+        top10 = df.sort_values("final_score", ascending=False).head(10)
+        st.dataframe(top10)
 
+        # Téléchargements
+        output_file = "resultats_scores.xlsx"
+        df.to_excel(output_file, index=False, engine='openpyxl')
+        with open(output_file, "rb") as f:
+            st.download_button("Télécharger le fichier complet", f, file_name=output_file)
+
+        top10_file = "top10_scores.xlsx"
+        top10.to_excel(top10_file, index=False, engine='openpyxl')
+        with open(top10_file, "rb") as f:
+            st.download_button("Télécharger le Top 10", f, file_name=top10_file)
+
+    # ------------------- Onglet 2 -------------------
+    with tab2:
+        st.subheader("Distribution des scores")
+        chart = alt.Chart(df).mark_bar().encode(
+            x=alt.X("final_score", bin=alt.Bin(maxbins=20)),
+            y='count()'
+        )
+        st.altair_chart(chart, use_container_width=True)
+
+        st.subheader("Boxplot des scores par critère")
+        score_melted = df[score_cols].melt(var_name='critere', value_name='score')
+        boxplot = alt.Chart(score_melted).mark_boxplot().encode(
+            x='critere',
+            y='score'
+        )
+        st.altair_chart(boxplot, use_container_width=True)
