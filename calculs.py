@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
 
+# ===========================
 # 🔹 Fonctions de calcul
+# ===========================
+
 def weighted_salary(salary):
     if pd.isna(salary):
         return np.nan
@@ -22,9 +25,9 @@ def simple_scale(value):
 def value_for_money(salary, tuition):
     if pd.isna(salary) or pd.isna(tuition):
         return np.nan
-    val = salary - tuition
-    val = max(10000, min(100000, val))
-    return (val - 10000) / (100000 - 10000)
+    value = salary - tuition
+    value = max(10000, min(100000, value))
+    return (value - 10000) / (100000 - 10000)
 
 def international_work_mobility(fm, fn, fo):
     if (fn == "-" and fo == "-"):
@@ -65,88 +68,67 @@ def career_progress_score(start_title, current_title, start_size, current_size):
             if any(k in title for k in keywords):
                 return lvl
         return 1
-
-    size_map = {
-        "1 to 9 employees": 1,
-        "10 to 19 employees": 2,
-        "20 to 49 employees": 3,
-        "50 to 249 employees": 4,
-        "250 to 4999 employees": 5,
-        "5000 employees and more": 6
-    }
-
-    def get_size(size_label):
+    def get_company_size(size_label):
         if pd.isna(size_label):
             return 1
-        for key, val in size_map.items():
-            if key.lower() in str(size_label).lower():
-                return val
+        mapping = {
+            "1 to 9 employees": 1,
+            "10 to 19 employees": 2,
+            "20 to 49 employees": 3,
+            "50 to 249 employees": 4,
+            "250 to 4999 employees": 5,
+            "5000 employees and more": 6
+        }
+        for key in mapping:
+            if key in str(size_label).lower():
+                return mapping[key]
         return 1
 
-    lvl_start, lvl_curr = get_level(start_title), get_level(current_title)
-    sz_start, sz_curr = get_size(start_size), get_size(current_size)
-    score = (max(0, lvl_curr - lvl_start) + max(0, sz_curr - sz_start)) / 7
+    start_level = get_level(start_title)
+    current_level = get_level(current_title)
+    start_size = get_company_size(start_size)
+    current_size = get_company_size(current_size)
+    level_progress = max(0, current_level - start_level)
+    size_progress = max(0, current_size - start_size)
+    score = (level_progress + size_progress) / 7
     return min(1, round(score, 3))
 
-# 🔹 Fonction principale pour calculer les scores
-def compute_scores(df):
-    # Nettoyer les colonnes pour éviter les KeyError
-    df.columns = (
-        df.columns.str.strip()
-                  .str.lower()
-                  .str.replace(r'[\s\W]+', '_', regex=True)
-    )
+# ===========================
+# 🔹 Calcul global des scores
+# ===========================
 
+def compute_scores(df):
     mapping = {
-        "weighted_salary": ["weighted_salary", "salaire"],
-        "salary_increase": ["salary_percentage_increase", "croissance_salaire"],
-        "aims_achieved": ["aims_achieved", "objectifs_atteints"],
-        "value_for_money": ["value_for_money", "rentabilite_ecole"],
-        "tuition": ["tuition_fee", "frais_de_scolarite"],
-        "career_service": ["careers_service_satisfaction", "service_carriere"],
-        "alumni_network": ["alumni_network_satisfaction", "reseau_alumni"],
-        "fm": ["nationality", "nationalite"],
-        "fn": ["firstemploymentcountry", "1er_pays_d_emploi"],
-        "fo": ["lastemploymentcountry", "dernier_pays_d_emploi"],
-        "start_title": ["posteinitial", "poste_initial"],
-        "current_title": ["posteactuel", "poste_actuel"],
-        "start_size": ["tailleinitiale", "taille_entreprise_initiale"],
-        "current_size": ["tailleactuelle", "taille_entreprise_actuelle"]
+        "weighted_salary": "Salaire",
+        "salary_increase": "Croissance Salaire",
+        "aims_achieved": "Objectifs atteints",
+        "value_for_money": "Rentabilité école",
+        "tuition": "Frais de scolarité",
+        "career_service": "Service carrière",
+        "alumni_network": "Réseau alumni",
+        "fm": "Nationalité",
+        "fn": "1er pays d'emploi",
+        "fo": "Dernier pays d'emploi",
+        "start_title": "Poste initial",
+        "current_title": "Poste actuel",
+        "start_size": "Taille entreprise initiale",
+        "current_size": "Taille entreprise actuelle"
     }
 
-    def find_column(names):
-        for name in names:
-            if name in df.columns:
-                return name
-        return None
-
-    # Appliquer les scores
-    df["weighted_salary_score"] = df[find_column(mapping["weighted_salary"])].apply(weighted_salary)
-    df["salary_increase_score"] = df[find_column(mapping["salary_increase"])].apply(salary_increase)
-    df["aims_achieved_score"] = df[find_column(mapping["aims_achieved"])].apply(simple_scale)
-    df["career_service_score"] = df[find_column(mapping["career_service"])].apply(simple_scale)
-    df["alumni_network_score"] = df[find_column(mapping["alumni_network"])].apply(simple_scale)
-
+    df["weighted_salary_score"] = df[mapping["weighted_salary"]].apply(weighted_salary)
+    df["salary_increase_score"] = df[mapping["salary_increase"]].apply(salary_increase)
+    df["aims_achieved_score"] = df[mapping["aims_achieved"]].apply(simple_scale)
+    df["career_service_score"] = df[mapping["career_service"]].apply(simple_scale)
+    df["alumni_network_score"] = df[mapping["alumni_network"]].apply(simple_scale)
     df["value_for_money_score"] = df.apply(
-        lambda x: value_for_money(x[find_column(mapping["weighted_salary"])],
-                                   x[find_column(mapping["tuition"])]), axis=1)
-
+        lambda x: value_for_money(x[mapping["weighted_salary"]], x[mapping["tuition"]]), axis=1)
     df["intl_work_mobility_score"] = df.apply(
-        lambda x: international_work_mobility(
-            x[find_column(mapping["fm"])],
-            x[find_column(mapping["fn"])],
-            x[find_column(mapping["fo"])]
-        ), axis=1)
-
+        lambda x: international_work_mobility(x[mapping["fm"]], x[mapping["fn"]], x[mapping["fo"]]), axis=1)
     df["career_progress_score"] = df.apply(
         lambda x: career_progress_score(
-            x[find_column(mapping["start_title"])],
-            x[find_column(mapping["current_title"])],
-            x[find_column(mapping["start_size"])],
-            x[find_column(mapping["current_size"])]
-        ), axis=1)
+            x[mapping["start_title"]], x[mapping["current_title"]],
+            x[mapping["start_size"]], x[mapping["current_size"]]), axis=1)
 
-    # Score final = moyenne des critères disponibles
     score_cols = [c for c in df.columns if c.endswith("_score")]
     df["final_score"] = df[score_cols].mean(axis=1)
 
