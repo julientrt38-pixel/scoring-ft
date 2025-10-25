@@ -1,11 +1,8 @@
 import streamlit as st
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
-from calculs import compute_scores  # logique analytique séparée
+from calculs import compute_scores
 
-# -------------------------
-# Configuration page
-# -------------------------
 st.set_page_config(page_title="FT Scoring App", layout="wide")
 st.title("📊 Dashboard — Évaluation Masters in Management")
 
@@ -38,12 +35,12 @@ df.columns = (
 )
 
 # -------------------------
-# Calcul des scores
+# Calcul scores
 # -------------------------
 df = compute_scores(df)
 
 # -------------------------
-# Mapping affichage (émoticones)
+# Mapping affichage
 # -------------------------
 col_rename = {
     "weighted_salary_score": "💰 Salaire",
@@ -64,8 +61,7 @@ col_rename = {
     "lastemploymentcountry": "🗺️ Pays d’emploi (dernier)",
     "tuition fee": "🏫 Frais de scolarité"
 }
-existing_renames = {k: v for k, v in col_rename.items() if k in df.columns}
-df.rename(columns=existing_renames, inplace=True)
+df.rename(columns={k:v for k,v in col_rename.items() if k in df.columns}, inplace=True)
 
 # -------------------------
 # Recherche globale
@@ -81,11 +77,27 @@ if search_term:
 # -------------------------
 cell_style_jscode = JsCode("""
 function(params) {
-    return {'textAlign': 'center', 'whiteSpace': 'normal', 'overflow': 'hidden', 'textOverflow': 'ellipsis'};
+    return {
+        'textAlign': 'center',
+        'whiteSpace': 'normal',
+        'overflow': 'hidden',
+        'textOverflow': 'ellipsis',
+        'border-radius': '10px',
+        'padding': '5px'
+    };
 }
 """)
 
-def afficher_tableau_aggrid(df_to_show, height=350):
+def afficher_tableau_aggrid(df_to_show, height=400):
+    # ID/Nom/Prénom en premier
+    id_cols = [c for c in df_to_show.columns if c.lower() in ["id", "identifiant", "identifier"]]
+    nom_cols = [c for c in df_to_show.columns if c.lower() in ["nom", "name", "lastname", "surname"]]
+    prenom_cols = [c for c in df_to_show.columns if c.lower() in ["prenom", "firstname", "given name"]]
+    front_cols = [c for c in [*id_cols[:1], *nom_cols[:1], *prenom_cols[:1]] if c is not None]
+
+    remaining_cols = [c for c in df_to_show.columns if c not in front_cols]
+    df_to_show = df_to_show[front_cols + remaining_cols]
+
     gb = GridOptionsBuilder.from_dataframe(df_to_show)
     gb.configure_default_column(
         resizable=True,
@@ -93,8 +105,8 @@ def afficher_tableau_aggrid(df_to_show, height=350):
         filter=True,
         wrapHeaderText=True,
         autoHeaderHeight=True,
-        minWidth=80,
-        maxWidth=260,
+        minWidth=100,
+        maxWidth=300,
         cellStyle=cell_style_jscode
     )
     grid_options = gb.build()
@@ -104,47 +116,31 @@ def afficher_tableau_aggrid(df_to_show, height=350):
         enable_enterprise_modules=False,
         theme="streamlit",
         height=height,
-        fit_columns_on_grid_load=False,
+        fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True
     )
 
 # -------------------------
 # Onglets Tableaux / Analyses
 # -------------------------
-tab1, tab2 = st.tabs(["📋 Données & Tableaux", "📈 Analyses"])
+tab1, tab2 = st.tabs(["📋 Tableaux", "📈 Analyses"])
 
 with tab1:
-    st.subheader("1) Tableaux")
+    st.subheader("1) Scores")
     scores_cols = [c for c in df_display_base.columns if "score" in str(c).lower() or str(c).lower() in ["final_score", "🏆 score final"]]
-    id_cols = [c for c in df_display_base.columns if c.lower() in ["id", "identifiant", "identifier"]]
-    nom_cols = [c for c in df_display_base.columns if c.lower() in ["nom", "name", "lastname", "surname"]]
-    prenom_cols = [c for c in df_display_base.columns if c.lower() in ["prenom", "firstname", "given name"]]
-
-    front_cols = [col for col in [*id_cols[:1], *nom_cols[:1], *prenom_cols[:1]] if col is not None]
-    scores_view_cols = front_cols + [c for c in scores_cols if c not in front_cols]
-
-    if scores_view_cols:
-        st.markdown("**Tableau : Scores**")
-        afficher_tableau_aggrid(df_display_base[scores_view_cols], height=380)
-    else:
-        st.info("Aucun score détecté. Affichage complet.")
-        afficher_tableau_aggrid(df_display_base, height=380)
+    afficher_tableau_aggrid(df_display_base[scores_cols + [c for c in df_display_base.columns if c.lower() in ["id","nom","prenom"]]], height=380)
 
     st.markdown("---")
     st.subheader("2) Données originales")
     no_score_cols = [c for c in df_display_base.columns if c not in scores_cols]
-    if no_score_cols:
-        afficher_tableau_aggrid(df_display_base[no_score_cols], height=380)
-    else:
-        st.info("Toutes les colonnes semblent être des scores.")
+    afficher_tableau_aggrid(df_display_base[no_score_cols + [c for c in df_display_base.columns if c.lower() in ["id","nom","prenom"]]], height=380)
 
     st.markdown("---")
     st.subheader("3) Tableau complet")
     afficher_tableau_aggrid(df_display_base, height=480)
 
 with tab2:
-    st.subheader("Visualisations & analyses")
-    st.info("Zone pour graphiques interactifs")
+    st.subheader("Visualisations")
     if "final_score" in df_display_base.columns:
         try:
             import altair as alt
