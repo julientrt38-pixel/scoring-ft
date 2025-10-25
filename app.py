@@ -7,7 +7,7 @@ st.set_page_config(page_title="FT Scoring App", layout="wide")
 
 st.markdown("""
 <style>
-/* Cards arrondies pour sections */
+/* Cards arrondies */
 .card {
     background-color: #ffffff;
     border-radius: 15px;
@@ -101,7 +101,6 @@ if search_term:
 # Affichage AgGrid
 # -------------------------
 def afficher_tableau_aggrid(df_to_show, height=400):
-    # ID/Nom/Prénom en premier
     id_cols = [c for c in df_to_show.columns if c.lower() in ["id", "identifiant", "identifier"]]
     nom_cols = [c for c in df_to_show.columns if c.lower() in ["nom", "name", "lastname", "surname"]]
     prenom_cols = [c for c in df_to_show.columns if c.lower() in ["prenom", "firstname", "given name"]]
@@ -132,11 +131,11 @@ def afficher_tableau_aggrid(df_to_show, height=400):
     )
 
 # -------------------------
-# Onglets / Sections
+# Sidebar navigation fixe
 # -------------------------
-tab1, tab2 = st.tabs(["📋 Tableaux", "📈 Analyses"])
+section = st.sidebar.radio("Navigation", ["Tableaux", "Analyses"])
 
-with tab1:
+if section == "Tableaux":
     score_cols = [c for c in df_display_base.columns if "score" in str(c).lower() or str(c).lower() in ["final_score", "🏆 score final"]]
 
     # Scores card
@@ -155,7 +154,7 @@ with tab1:
         st.markdown('<div class="card"><h3>Tableau complet</h3></div>', unsafe_allow_html=True)
         afficher_tableau_aggrid(df_display_base, height=480)
 
-with tab2:
+elif section == "Analyses":
     st.subheader("Visualisations")
     if "final_score" in df_display_base.columns:
         try:
@@ -171,3 +170,4 @@ with tab2:
                 st.info("Pas assez de données numériques pour afficher un histogramme.")
         except Exception:
             st.info("Altair non disponible — graphiques désactivés.")
+
