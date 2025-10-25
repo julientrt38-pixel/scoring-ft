@@ -75,20 +75,24 @@ if search_term:
 # -------------------------
 # AgGrid Utilities
 # -------------------------
-cell_style_jscode = JsCode("""
+# Badge color JS pour scores
+badge_jscode = JsCode("""
 function(params) {
+    let value = params.value;
+    let color = '';
+    if (value >= 0.75) { color = '#a3e635'; }        // vert
+    else if (value >= 0.5) { color = '#facc15'; }    // jaune
+    else { color = '#f87171'; }                      // rouge
     return {
+        'backgroundColor': color,
+        'borderRadius': '8px',
         'textAlign': 'center',
-        'whiteSpace': 'normal',
-        'overflow': 'hidden',
-        'textOverflow': 'ellipsis',
-        'border-radius': '10px',
         'padding': '5px'
     };
 }
 """)
 
-def afficher_tableau_aggrid(df_to_show, height=400):
+def afficher_tableau_aggrid(df_to_show, score_cols=None, height=400):
     # ID/Nom/Prénom en premier
     id_cols = [c for c in df_to_show.columns if c.lower() in ["id", "identifiant", "identifier"]]
     nom_cols = [c for c in df_to_show.columns if c.lower() in ["nom", "name", "lastname", "surname"]]
@@ -106,9 +110,15 @@ def afficher_tableau_aggrid(df_to_show, height=400):
         wrapHeaderText=True,
         autoHeaderHeight=True,
         minWidth=100,
-        maxWidth=300,
-        cellStyle=cell_style_jscode
+        maxWidth=300
     )
+
+    # Appliquer badge color pour les colonnes scores
+    if score_cols:
+        for col in score_cols:
+            if col in df_to_show.columns:
+                gb.configure_column(col, cellStyle=badge_jscode)
+
     grid_options = gb.build()
     AgGrid(
         df_to_show,
@@ -127,17 +137,17 @@ tab1, tab2 = st.tabs(["📋 Tableaux", "📈 Analyses"])
 
 with tab1:
     st.subheader("1) Scores")
-    scores_cols = [c for c in df_display_base.columns if "score" in str(c).lower() or str(c).lower() in ["final_score", "🏆 score final"]]
-    afficher_tableau_aggrid(df_display_base[scores_cols + [c for c in df_display_base.columns if c.lower() in ["id","nom","prenom"]]], height=380)
+    score_cols = [c for c in df_display_base.columns if "score" in str(c).lower() or str(c).lower() in ["final_score", "🏆 score final"]]
+    afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=380)
 
     st.markdown("---")
     st.subheader("2) Données originales")
-    no_score_cols = [c for c in df_display_base.columns if c not in scores_cols]
+    no_score_cols = [c for c in df_display_base.columns if c not in score_cols]
     afficher_tableau_aggrid(df_display_base[no_score_cols + [c for c in df_display_base.columns if c.lower() in ["id","nom","prenom"]]], height=380)
 
     st.markdown("---")
     st.subheader("3) Tableau complet")
-    afficher_tableau_aggrid(df_display_base, height=480)
+    afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=480)
 
 with tab2:
     st.subheader("Visualisations")
