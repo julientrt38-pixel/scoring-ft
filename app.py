@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
-from calculs import compute_scores  # import des calculs depuis calculs.py
+from calculs import compute_scores  # logique analytique séparée
 
 # -------------------------
 # Configuration page
@@ -10,29 +10,25 @@ st.set_page_config(page_title="FT Scoring App", layout="wide")
 st.title("📊 Dashboard — Évaluation Masters in Management")
 
 # -------------------------
-# Upload de l'Excel
+# Upload Excel
 # -------------------------
-uploaded_file = st.file_uploader(
-    "Importer un fichier Excel (.xlsx)", 
-    type=["xlsx"]
-)
+uploaded_file = st.file_uploader("Importer un fichier Excel (.xlsx)", type=["xlsx"])
 if not uploaded_file:
     st.info(
         "Téléverse un fichier Excel contenant tes données "
-        "(colonnes attendues: 'weighted salary', 'salary percentage increase', "
-        "'tuition fee', 'posteinitial', 'posteactuel', 'tailleinitiale', "
-        "'tailleactuelle', 'nationality', 'firstemploymentcountry', 'lastemploymentcountry', etc.)."
+        "(colonnes attendues : 'weighted salary', 'salary percentage increase', 'tuition fee', "
+        "'posteinitial', 'posteactuel', 'tailleinitiale', 'tailleactuelle', "
+        "'nationality', 'firstemploymentcountry', 'lastemploymentcountry', etc.)."
     )
     st.stop()
 
-# Lecture
 try:
     df = pd.read_excel(uploaded_file)
 except Exception as e:
     st.error(f"Impossible de lire l'Excel : {e}")
     st.stop()
 
-# Normalisation des en-têtes
+# Normalisation des colonnes
 df.columns = (
     df.columns.str.strip()
               .str.lower()
@@ -47,7 +43,7 @@ df.columns = (
 df = compute_scores(df)
 
 # -------------------------
-# Mapping affichage (émoticones + libellés)
+# Mapping affichage (émoticones)
 # -------------------------
 col_rename = {
     "weighted_salary_score": "💰 Salaire",
@@ -75,11 +71,10 @@ df.rename(columns=existing_renames, inplace=True)
 # Recherche globale
 # -------------------------
 search_term = st.text_input("🔎 Recherche globale", value="").strip()
+df_display_base = df.copy()
 if search_term:
     mask = df.astype(str).apply(lambda row: row.str.contains(search_term, case=False, na=False).any(), axis=1)
     df_display_base = df[mask].copy()
-else:
-    df_display_base = df.copy()
 
 # -------------------------
 # AgGrid Utilities
@@ -114,32 +109,29 @@ def afficher_tableau_aggrid(df_to_show, height=350):
     )
 
 # -------------------------
-# Onglets : Tableaux / Analyses
+# Onglets Tableaux / Analyses
 # -------------------------
 tab1, tab2 = st.tabs(["📋 Données & Tableaux", "📈 Analyses"])
 
 with tab1:
     st.subheader("1) Tableaux")
-
-    # Scores only view
     scores_cols = [c for c in df_display_base.columns if "score" in str(c).lower() or str(c).lower() in ["final_score", "🏆 score final"]]
     id_cols = [c for c in df_display_base.columns if c.lower() in ["id", "identifiant", "identifier"]]
-    nom_cols = [c for c in df_display_base.columns if c.lower() in ["nom", "name", "last name", "lastname", "surname"]]
-    prenom_cols = [c for c in df_display_base.columns if c.lower() in ["prenom", "first name", "firstname", "given name"]]
+    nom_cols = [c for c in df_display_base.columns if c.lower() in ["nom", "name", "lastname", "surname"]]
+    prenom_cols = [c for c in df_display_base.columns if c.lower() in ["prenom", "firstname", "given name"]]
 
     front_cols = [col for col in [*id_cols[:1], *nom_cols[:1], *prenom_cols[:1]] if col is not None]
     scores_view_cols = front_cols + [c for c in scores_cols if c not in front_cols]
 
     if scores_view_cols:
-        df_scores_view = df_display_base[scores_view_cols].copy()
-        st.markdown("**Tableau : Scores (avec ID / Nom / Prénom si détectés)**")
-        afficher_tableau_aggrid(df_scores_view, height=380)
+        st.markdown("**Tableau : Scores**")
+        afficher_tableau_aggrid(df_display_base[scores_view_cols], height=380)
     else:
-        st.info("Aucun score détecté dans les colonnes. Affichage complet.")
+        st.info("Aucun score détecté. Affichage complet.")
         afficher_tableau_aggrid(df_display_base, height=380)
 
     st.markdown("---")
-    st.subheader("2) Données originales (sans colonnes de score)")
+    st.subheader("2) Données originales")
     no_score_cols = [c for c in df_display_base.columns if c not in scores_cols]
     if no_score_cols:
         afficher_tableau_aggrid(df_display_base[no_score_cols], height=380)
