@@ -4,6 +4,29 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 from calculs import compute_scores
 
 st.set_page_config(page_title="FT Scoring App", layout="wide")
+
+st.markdown("""
+<style>
+/* Container cards arrondies avec ombre */
+.card {
+    background-color: #ffffff;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
+}
+/* Titres des sections */
+.card h3 {
+    margin-top: 0px;
+    margin-bottom: 10px;
+}
+/* AgGrid rounded cells */
+.ag-cell {
+    border-radius: 8px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📊 Dashboard — Évaluation Masters in Management")
 
 # -------------------------
@@ -25,7 +48,7 @@ except Exception as e:
     st.error(f"Impossible de lire l'Excel : {e}")
     st.stop()
 
-# Normalisation des colonnes
+# Normalisation colonnes
 df.columns = (
     df.columns.str.strip()
               .str.lower()
@@ -73,16 +96,15 @@ if search_term:
     df_display_base = df[mask].copy()
 
 # -------------------------
-# AgGrid Utilities
-# -------------------------
 # Badge color JS pour scores
+# -------------------------
 badge_jscode = JsCode("""
 function(params) {
     let value = params.value;
     let color = '';
-    if (value >= 0.75) { color = '#a3e635'; }        // vert
-    else if (value >= 0.5) { color = '#facc15'; }    // jaune
-    else { color = '#f87171'; }                      // rouge
+    if (value >= 0.75) { color = '#a3e635'; } // vert
+    else if (value >= 0.5) { color = '#facc15'; } // jaune
+    else { color = '#f87171'; } // rouge
     return {
         'backgroundColor': color,
         'borderRadius': '8px',
@@ -113,7 +135,6 @@ def afficher_tableau_aggrid(df_to_show, score_cols=None, height=400):
         maxWidth=300
     )
 
-    # Appliquer badge color pour les colonnes scores
     if score_cols:
         for col in score_cols:
             if col in df_to_show.columns:
@@ -131,23 +152,28 @@ def afficher_tableau_aggrid(df_to_show, score_cols=None, height=400):
     )
 
 # -------------------------
-# Onglets Tableaux / Analyses
+# Onglets / Sections
 # -------------------------
 tab1, tab2 = st.tabs(["📋 Tableaux", "📈 Analyses"])
 
 with tab1:
-    st.subheader("1) Scores")
     score_cols = [c for c in df_display_base.columns if "score" in str(c).lower() or str(c).lower() in ["final_score", "🏆 score final"]]
-    afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=380)
 
-    st.markdown("---")
-    st.subheader("2) Données originales")
+    # Scores card
+    with st.container():
+        st.markdown('<div class="card"><h3>Scores</h3></div>', unsafe_allow_html=True)
+        afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=380)
+
+    # Données originales card
     no_score_cols = [c for c in df_display_base.columns if c not in score_cols]
-    afficher_tableau_aggrid(df_display_base[no_score_cols + [c for c in df_display_base.columns if c.lower() in ["id","nom","prenom"]]], height=380)
+    with st.container():
+        st.markdown('<div class="card"><h3>Données originales</h3></div>', unsafe_allow_html=True)
+        afficher_tableau_aggrid(df_display_base[no_score_cols + [c for c in df_display_base.columns if c.lower() in ["id","nom","prenom"]]], height=380)
 
-    st.markdown("---")
-    st.subheader("3) Tableau complet")
-    afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=480)
+    # Tableau complet card
+    with st.container():
+        st.markdown('<div class="card"><h3>Tableau complet</h3></div>', unsafe_allow_html=True)
+        afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=480)
 
 with tab2:
     st.subheader("Visualisations")
