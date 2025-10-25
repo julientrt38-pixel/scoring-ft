@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
 
 # =======================================
 # 🔹 PARTIE ANALYTIQUE — Calcul des scores
@@ -111,7 +111,8 @@ def compute_scores(df):
         lambda x: value_for_money(x[mapping["weighted_salary"]], x[mapping["tuition"]]), axis=1)
 
     df["intl_work_mobility_score"] = df.apply(
-        lambda x: international_work_mobility(x[mapping["fm"]], x[mapping["fn"]], x[mapping["fo"]]), axis=1)
+        lambda x: international_work_mobility(
+            x[mapping["fm"]], x[mapping["fn"]], x[mapping["fo"]]), axis=1)
 
     df["career_progress_score"] = df.apply(
         lambda x: career_progress_score(
@@ -135,7 +136,7 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file)
     df = compute_scores(df)
 
-    # Renommage colonnes avec emojis + simplification
+    # Renommage colonnes
     col_rename = {
         "weighted_salary_score": "💰 Salaire",
         "salary_increase_score": "📈 Croissance salaire",
@@ -157,30 +158,71 @@ if uploaded_file:
     }
     df.rename(columns=col_rename, inplace=True)
 
-    # Création des onglets
+    # JS pour centrer le texte
+    center_text = JsCode("""
+    function(params) {
+        return {'textAlign': 'center'};
+    }
+    """)
+
+    # ======================================
+    # Onglets Streamlit
+    # ======================================
     tab1, tab2 = st.tabs(["📋 Données & Tableaux", "📈 Analyses"])
 
     with tab1:
-        st.subheader("📊 Tableau avec scores uniquement")
+        st.subheader("📊 Tableau avec scores (et ID / Nom / Prénom)")
+
+        # Inclusion automatique des identifiants
+        id_cols = [c for c in df.columns if c.lower() in ["id", "nom", "prenom", "name", "first name", "last name"]]
         score_cols = [c for c in df.columns if "score" in c.lower()]
-        df_scores = df[score_cols]
+        display_cols = id_cols + score_cols
+
+        df_scores = df[display_cols].copy()
 
         gb = GridOptionsBuilder.from_dataframe(df_scores)
-        gb.configure_default_column(resizable=True, filter=True, sortable=True, min_column_width=120, wrapHeaderText=True, autoHeaderHeight=True)
+        gb.configure_default_column(
+            resizable=True,
+            filter=True,
+            sortable=True,
+            min_column_width=100,
+            wrapHeaderText=True,
+            autoHeaderHeight=True,
+            cellStyle=center_text
+        )
+        gb.configure_grid_options(domLayout='autoHeight')
         grid_options = gb.build()
-        AgGrid(df_scores, gridOptions=grid_options, height=400)
+        AgGrid(df_scores, gridOptions=grid_options, fit_columns_on_grid_load=True)
 
         st.subheader("📁 Tableau sans scores")
         df_no_scores = df[[c for c in df.columns if not c.lower().endswith("_score") and c != "🏆 Score final"]]
         gb2 = GridOptionsBuilder.from_dataframe(df_no_scores)
-        gb2.configure_default_column(resizable=True, filter=True, sortable=True, min_column_width=120, wrapHeaderText=True, autoHeaderHeight=True)
-        AgGrid(df_no_scores, gridOptions=gb2.build(), height=400)
+        gb2.configure_default_column(
+            resizable=True,
+            filter=True,
+            sortable=True,
+            min_column_width=100,
+            wrapHeaderText=True,
+            autoHeaderHeight=True,
+            cellStyle=center_text
+        )
+        AgGrid(df_no_scores, gridOptions=gb2.build(), fit_columns_on_grid_load=True)
 
         st.subheader("📑 Tableau complet")
         gb3 = GridOptionsBuilder.from_dataframe(df)
-        gb3.configure_default_column(resizable=True, filter=True, sortable=True, min_column_width=120, wrapHeaderText=True, autoHeaderHeight=True)
-        AgGrid(df, gridOptions=gb3.build(), height=500)
+        gb3.configure_default_column(
+            resizable=True,
+            filter=True,
+            sortable=True,
+            min_column_width=100,
+            wrapHeaderText=True,
+            autoHeaderHeight=True,
+            cellStyle=center_text
+        )
+        AgGrid(df, gridOptions=gb3.build(), fit_columns_on_grid_load=True)
 
     with tab2:
         st.subheader("📈 Analyses visuelles à venir...")
         st.info("Les graphiques interactifs seront ajoutés ici prochainement.")
+
+
