@@ -7,22 +7,24 @@ st.set_page_config(page_title="FT Scoring App", layout="wide")
 
 st.markdown("""
 <style>
-/* Container cards arrondies avec ombre */
+/* Cards arrondies pour sections */
 .card {
     background-color: #ffffff;
     border-radius: 15px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.05);
 }
-/* Titres des sections */
+/* Titres sections */
 .card h3 {
-    margin-top: 0px;
+    margin-top: 0;
     margin-bottom: 10px;
 }
 /* AgGrid rounded cells */
 .ag-cell {
     border-radius: 8px !important;
+    padding: 5px !important;
+    line-height: 1.5 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -96,25 +98,9 @@ if search_term:
     df_display_base = df[mask].copy()
 
 # -------------------------
-# Badge color JS pour scores
+# Affichage AgGrid
 # -------------------------
-badge_jscode = JsCode("""
-function(params) {
-    let value = params.value;
-    let color = '';
-    if (value >= 0.75) { color = '#a3e635'; } // vert
-    else if (value >= 0.5) { color = '#facc15'; } // jaune
-    else { color = '#f87171'; } // rouge
-    return {
-        'backgroundColor': color,
-        'borderRadius': '8px',
-        'textAlign': 'center',
-        'padding': '5px'
-    };
-}
-""")
-
-def afficher_tableau_aggrid(df_to_show, score_cols=None, height=400):
+def afficher_tableau_aggrid(df_to_show, height=400):
     # ID/Nom/Prénom en premier
     id_cols = [c for c in df_to_show.columns if c.lower() in ["id", "identifiant", "identifier"]]
     nom_cols = [c for c in df_to_show.columns if c.lower() in ["nom", "name", "lastname", "surname"]]
@@ -134,12 +120,6 @@ def afficher_tableau_aggrid(df_to_show, score_cols=None, height=400):
         minWidth=100,
         maxWidth=300
     )
-
-    if score_cols:
-        for col in score_cols:
-            if col in df_to_show.columns:
-                gb.configure_column(col, cellStyle=badge_jscode)
-
     grid_options = gb.build()
     AgGrid(
         df_to_show,
@@ -162,7 +142,7 @@ with tab1:
     # Scores card
     with st.container():
         st.markdown('<div class="card"><h3>Scores</h3></div>', unsafe_allow_html=True)
-        afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=380)
+        afficher_tableau_aggrid(df_display_base, height=380)
 
     # Données originales card
     no_score_cols = [c for c in df_display_base.columns if c not in score_cols]
@@ -173,7 +153,7 @@ with tab1:
     # Tableau complet card
     with st.container():
         st.markdown('<div class="card"><h3>Tableau complet</h3></div>', unsafe_allow_html=True)
-        afficher_tableau_aggrid(df_display_base, score_cols=score_cols, height=480)
+        afficher_tableau_aggrid(df_display_base, height=480)
 
 with tab2:
     st.subheader("Visualisations")
