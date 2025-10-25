@@ -1,5 +1,6 @@
-streamlit
-pandas
-numpy
-openpyxl
-streamlit-aggrid
+streamlit>=1.25.0
+pandas>=2.1.0
+numpy>=1.25.0
+openpyxl>=3.1.0
+streamlit-aggrid>=0.4.0
+altair>=5.0.1  # optionnel, si tu veux les histogrammes dans l’onglet Analyses
